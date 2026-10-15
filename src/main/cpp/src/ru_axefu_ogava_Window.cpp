@@ -68,31 +68,48 @@ JNIEXPORT void JNICALL Java_ru_axefu_ogava_Window_close(JNIEnv *, jobject, jlong
   glfwSetWindowShouldClose(window, GL_TRUE);
 }
 
+void tick(GLFWwindow* window) {
+  //TODO: run commands from command buffer
+}
+
 JNIEXPORT void JNICALL Java_ru_axefu_ogava_Window_loop(JNIEnv *env, jclass clazz) {
-  while (windows->size() > 0) {
-    std::lock_guard lock(mtx);
+  while (true) {
     glfwPollEvents();
-    auto it = windows->begin();
-    while (it != windows->end()) {
-      GLFWwindow* window = *it;
-      if (glfwWindowShouldClose(window)) {
-        glfwDestroyWindow(window);
-        it = windows->erase(it);
-        continue;
+    std::vector<GLFWwindow*>::iterator it;
+    bool isEnd = false;
+    bool isFirst = true;
+    while (!isEnd) {
+      std::lock_guard lock(mtx);
+      if (isFirst) {
+        isFirst = false;
+        it = windows->begin();
       }
+      if (it != windows->end()) {
+        GLFWwindow* window = *it;
+        if (glfwWindowShouldClose(window)) {
+          glfwDestroyWindow(window);
+          it = windows->erase(it);
+          continue;
+        }
+        glfwMakeContextCurrent(window);
 
-      glfwMakeContextCurrent(window);
-      glfwSwapBuffers(window);
-      glfwMakeContextCurrent(nullptr);
+        tick(window);
 
-      ++it;
+        glfwSwapBuffers(window);
+        glfwMakeContextCurrent(nullptr);
+        ++it;
+      } else {
+        isEnd = true;
+      }
+      if (windows->size() == 0) {
+        delete windows;
+        windows = nullptr;
+        glfwTerminate();
+        glfwInitialized = false;
+        jfieldID field = env->GetStaticFieldID(clazz, "glfwThread", "Ljava/lang/Thread;");
+        env->SetStaticObjectField(clazz, field, nullptr);
+        return;
+      }
     }
   }
-  std::lock_guard lock(mtx);
-  delete windows;
-  windows = nullptr;
-  glfwTerminate();
-  glfwInitialized = false;
-  jfieldID field = env->GetStaticFieldID(clazz, "glfwThread", "Ljava/lang/Thread;");
-  env->SetStaticObjectField(clazz, field, nullptr);
 }

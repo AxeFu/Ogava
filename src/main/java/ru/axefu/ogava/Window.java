@@ -7,12 +7,12 @@ public class Window {
     private static Thread glfwThread;
 
     private final long id;
-    public Window(int width, int height, String title) throws InterruptedException {
+    public Window(int width, int height, String title) {
         id = create(width, height, title);
         if (id < 0) {
             throw new RuntimeException("Failed to create window: " + id);
         }
-        if (glfwThread == null || !glfwThread.isAlive()) {
+        if (glfwThread == null) {
             glfwThread = Thread.ofPlatform().start(Window::loop);
         }
     }
