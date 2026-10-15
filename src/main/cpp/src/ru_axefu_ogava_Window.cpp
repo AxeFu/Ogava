@@ -8,7 +8,7 @@
 #include <vector>
 
 static bool glfwInitialized = false;
-static std::mutex mtx;
+static bool ownerThreadWantInvoke = false;
 static std::vector<GLFWwindow*>* windows;
 
 long init() {
@@ -27,8 +27,15 @@ long init() {
   return GLFW_TRUE;
 }
 
+void tick(GLFWwindow* window) {
+  //TODO: run commands from command buffer
+}
+
+JNIEXPORT void JNICALL Java_ru_axefu_ogava_Window_invokeLater(JNIEnv *, jclass) {
+  ownerThreadWantInvoke = true;
+}
+
 JNIEXPORT jlong JNICALL Java_ru_axefu_ogava_Window_create(JNIEnv *env, jobject, jint width, jint height, jstring title) {
-  std::lock_guard lock(mtx);
   if (init() != GLFW_TRUE) {
     return -1;
   }
@@ -68,23 +75,12 @@ JNIEXPORT void JNICALL Java_ru_axefu_ogava_Window_close(JNIEnv *, jobject, jlong
   glfwSetWindowShouldClose(window, GL_TRUE);
 }
 
-void tick(GLFWwindow* window) {
-  //TODO: run commands from command buffer
-}
-
 JNIEXPORT void JNICALL Java_ru_axefu_ogava_Window_loop(JNIEnv *env, jclass clazz) {
-  while (true) {
+  while (windows != nullptr) {
     glfwPollEvents();
-    std::vector<GLFWwindow*>::iterator it;
-    bool isEnd = false;
-    bool isFirst = true;
-    while (!isEnd) {
-      std::lock_guard lock(mtx);
-      if (isFirst) {
-        isFirst = false;
-        it = windows->begin();
-      }
-      if (it != windows->end()) {
+
+    auto it = windows->begin();
+    while (it != windows->end()) {
         GLFWwindow* window = *it;
         if (glfwWindowShouldClose(window)) {
           glfwDestroyWindow(window);
@@ -98,18 +94,21 @@ JNIEXPORT void JNICALL Java_ru_axefu_ogava_Window_loop(JNIEnv *env, jclass clazz
         glfwSwapBuffers(window);
         glfwMakeContextCurrent(nullptr);
         ++it;
-      } else {
-        isEnd = true;
-      }
-      if (windows->size() == 0) {
-        delete windows;
-        windows = nullptr;
-        glfwTerminate();
-        glfwInitialized = false;
-        jfieldID field = env->GetStaticFieldID(clazz, "glfwThread", "Ljava/lang/Thread;");
-        env->SetStaticObjectField(clazz, field, nullptr);
-        return;
-      }
+    }
+
+    if (windows->size() == 0) {
+      delete windows;
+      windows = nullptr;
+      glfwTerminate();
+      glfwInitialized = false;
+      jfieldID glfwThread = env->GetStaticFieldID(clazz, "glfwThread", "Ljava/lang/Thread;");
+      env->SetStaticObjectField(clazz, glfwThread, nullptr);
+    }
+
+    if (ownerThreadWantInvoke) {
+      ownerThreadWantInvoke = false;
+      jmethodID applyInvoke = env->GetStaticMethodID(clazz, "applyInvoke", "()V");
+      env->CallStaticVoidMethod(clazz, applyInvoke);
     }
   }
 }

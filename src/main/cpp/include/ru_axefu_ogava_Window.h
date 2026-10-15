@@ -9,6 +9,14 @@ extern "C" {
 #endif
 /*
  * Class:     ru_axefu_ogava_Window
+ * Method:    invokeLater
+ * Signature: ()V
+ */
+JNIEXPORT void JNICALL Java_ru_axefu_ogava_Window_invokeLater
+  (JNIEnv *, jclass);
+
+/*
+ * Class:     ru_axefu_ogava_Window
  * Method:    create
  * Signature: (IILjava/lang/String;)J
  */
