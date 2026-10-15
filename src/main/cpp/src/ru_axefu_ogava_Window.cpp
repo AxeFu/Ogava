@@ -1,12 +1,14 @@
 #include "ru_axefu_ogava_Window.h"
 
 #define GLEW_STATIC
-#include <vector>
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include <jni.h>
+#include <mutex>
+#include <vector>
 
 static bool glfwInitialized = false;
+static std::mutex mtx;
 static std::vector<GLFWwindow*>* windows;
 
 long init() {
@@ -26,6 +28,7 @@ long init() {
 }
 
 JNIEXPORT jlong JNICALL Java_ru_axefu_ogava_Window_create(JNIEnv *env, jobject, jint width, jint height, jstring title) {
+  std::lock_guard lock(mtx);
   if (init() != GLFW_TRUE) {
     return -1;
   }
@@ -38,11 +41,6 @@ JNIEXPORT jlong JNICALL Java_ru_axefu_ogava_Window_create(JNIEnv *env, jobject, 
     glfwTerminate();
     return -2;
   }
-
-  if (windows == nullptr) {
-    windows = new std::vector<GLFWwindow*>();
-  }
-  windows->push_back(window);
 
   glfwMakeContextCurrent(window);
 
@@ -57,6 +55,11 @@ JNIEXPORT jlong JNICALL Java_ru_axefu_ogava_Window_create(JNIEnv *env, jobject, 
   glfwGetWindowSize(window, &vw, &vh);
   glViewport(0, 0, vw, vh);
   glfwMakeContextCurrent(nullptr);
+
+  if (windows == nullptr) {
+    windows = new std::vector<GLFWwindow*>();
+  }
+  windows->push_back(window);
   return (uintptr_t)window;
 }
 
@@ -65,22 +68,35 @@ JNIEXPORT void JNICALL Java_ru_axefu_ogava_Window_close(JNIEnv *, jobject, jlong
   glfwSetWindowShouldClose(window, GL_TRUE);
 }
 
-JNIEXPORT void JNICALL Java_ru_axefu_ogava_Window_loop(JNIEnv *, jclass) {
-  while (windows->size() > 0) {
-    glfwPollEvents();
-    for (GLFWwindow* window : *windows) {
-      if (!glfwWindowShouldClose(window)) {
-        glfwMakeContextCurrent(window);
-        glfwSwapBuffers(window);
-        glfwMakeContextCurrent(nullptr);
-      } else if (auto it = std::ranges::find(*windows, window); it != windows->end()) {
-          glfwDestroyWindow(window);
-          windows->erase(it);
-        }
+void tick() {
+  std::lock_guard lock(mtx);
+  glfwPollEvents();
+  auto it = windows->begin();
+  while (it != windows->end()) {
+    GLFWwindow* window = *it;
+    if (glfwWindowShouldClose(window)) {
+      glfwDestroyWindow(window);
+      it = windows->erase(it);
+      continue;
     }
+
+    glfwMakeContextCurrent(window);
+    glfwSwapBuffers(window);
+    glfwMakeContextCurrent(nullptr);
+
+    ++it;
   }
+}
+
+JNIEXPORT void JNICALL Java_ru_axefu_ogava_Window_loop(JNIEnv *env, jclass clazz) {
+  while (windows->size() > 0) {
+    tick();
+  }
+  std::lock_guard lock(mtx);
   delete windows;
   windows = nullptr;
-  glfwInitialized = false;
   glfwTerminate();
+  glfwInitialized = false;
+  jfieldID field = env->GetStaticFieldID(clazz, "glfwThread", "Ljava/lang/Thread;");
+  env->SetStaticObjectField(clazz, field, nullptr);
 }
