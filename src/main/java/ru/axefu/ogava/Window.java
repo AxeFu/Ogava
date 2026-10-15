@@ -42,7 +42,7 @@ public class Window implements Closeable {
         runnables.clear();
     }
     private static native void invokeLater();
-    private static void invokeLater(Runnable runnable) {
+    public static void invokeLater(Runnable runnable) {
         buffer.add(runnable);
         if (glfwThread == null) {
             glfwThread = Thread.ofPlatform().start(() -> {
@@ -53,7 +53,7 @@ public class Window implements Closeable {
         }
         invokeLater();
     }
-    private static void invoke(Runnable runnable) {
+    public static void invoke(Runnable runnable) {
         CountDownLatch latch = new CountDownLatch(1);
         invokeLater(() -> {
             runnable.run();
