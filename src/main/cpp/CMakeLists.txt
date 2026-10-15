@@ -11,7 +11,7 @@ find_package(GLEW REQUIRED)
 find_package(glfw3 CONFIG REQUIRED)
 
 add_library(ogava SHARED
-        src/ru_axefu_ogava_Window.cpp
+    src/ru_axefu_ogava_Window.cpp
 )
 
 target_include_directories(ogava PRIVATE

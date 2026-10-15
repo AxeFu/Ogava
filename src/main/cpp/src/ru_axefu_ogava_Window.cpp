@@ -1,10 +1,10 @@
 #include "ru_axefu_ogava_Window.h"
-#include <jni.h>
 
 #define GLEW_STATIC
 #include <vector>
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
+#include <jni.h>
 
 static bool glfwInitialized = false;
 static std::vector<GLFWwindow*>* windows;
@@ -22,13 +22,12 @@ long init() {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
   }
-  return 0;
+  return GLFW_TRUE;
 }
 
 JNIEXPORT jlong JNICALL Java_ru_axefu_ogava_Window_create(JNIEnv *env, jobject, jint width, jint height, jstring title) {
-  int initResult = init();
-  if (initResult != 0) {
-    return initResult;
+  if (init() != GLFW_TRUE) {
+    return -1;
   }
 
   const char* cstr = env->GetStringUTFChars(title, nullptr);
