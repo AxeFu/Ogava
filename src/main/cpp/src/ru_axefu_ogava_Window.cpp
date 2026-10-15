@@ -81,6 +81,7 @@ JNIEXPORT void JNICALL Java_ru_axefu_ogava_Window_loop(JNIEnv *, jclass) {
     }
   }
   delete windows;
+  windows = nullptr;
   glfwInitialized = false;
   glfwTerminate();
 }
