@@ -68,29 +68,25 @@ JNIEXPORT void JNICALL Java_ru_axefu_ogava_Window_close(JNIEnv *, jobject, jlong
   glfwSetWindowShouldClose(window, GL_TRUE);
 }
 
-void tick() {
-  std::lock_guard lock(mtx);
-  glfwPollEvents();
-  auto it = windows->begin();
-  while (it != windows->end()) {
-    GLFWwindow* window = *it;
-    if (glfwWindowShouldClose(window)) {
-      glfwDestroyWindow(window);
-      it = windows->erase(it);
-      continue;
-    }
-
-    glfwMakeContextCurrent(window);
-    glfwSwapBuffers(window);
-    glfwMakeContextCurrent(nullptr);
-
-    ++it;
-  }
-}
-
 JNIEXPORT void JNICALL Java_ru_axefu_ogava_Window_loop(JNIEnv *env, jclass clazz) {
   while (windows->size() > 0) {
-    tick();
+    std::lock_guard lock(mtx);
+    glfwPollEvents();
+    auto it = windows->begin();
+    while (it != windows->end()) {
+      GLFWwindow* window = *it;
+      if (glfwWindowShouldClose(window)) {
+        glfwDestroyWindow(window);
+        it = windows->erase(it);
+        continue;
+      }
+
+      glfwMakeContextCurrent(window);
+      glfwSwapBuffers(window);
+      glfwMakeContextCurrent(nullptr);
+
+      ++it;
+    }
   }
   std::lock_guard lock(mtx);
   delete windows;
