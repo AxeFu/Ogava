@@ -16,7 +16,6 @@ long init() {
     glfwInitHint(GLFW_PLATFORM, GLFW_PLATFORM_X11);
 #endif
     if (glfwInit() != GLFW_TRUE) {
-      glfwInitialized = false;
       return -1;
     }
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
@@ -82,5 +81,6 @@ JNIEXPORT void JNICALL Java_ru_axefu_ogava_Window_loop(JNIEnv *, jclass) {
     }
   }
   delete windows;
+  glfwInitialized = false;
   glfwTerminate();
 }
