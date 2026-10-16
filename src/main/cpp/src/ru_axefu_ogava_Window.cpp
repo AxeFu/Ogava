@@ -4,11 +4,10 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include <jni.h>
-#include <mutex>
 #include <vector>
 
 static bool glfwInitialized = false;
-static bool ownerThreadWantInvoke = false;
+static bool mainThreadWantInvoke = false;
 static std::vector<GLFWwindow*>* windows;
 
 long init() {
@@ -27,12 +26,22 @@ long init() {
   return GLFW_TRUE;
 }
 
+void applyInvoke(JNIEnv *env, jclass clazz) {
+  jmethodID applyInvoke = env->GetStaticMethodID(clazz, "applyInvoke", "()V");
+  env->CallStaticVoidMethod(clazz, applyInvoke);
+}
+
+void glfwThreadSet(JNIEnv *env, jclass clazz, jobject value) {
+  jfieldID glfwThread = env->GetStaticFieldID(clazz, "glfwThread", "Ljava/lang/Thread;");
+  env->SetStaticObjectField(clazz, glfwThread, value);
+}
+
 void tick(GLFWwindow* window) {
   //TODO: run commands from command buffer
 }
 
 JNIEXPORT void JNICALL Java_ru_axefu_ogava_Window_invokeLater(JNIEnv *, jclass) {
-  ownerThreadWantInvoke = true;
+  mainThreadWantInvoke = true;
 }
 
 JNIEXPORT jlong JNICALL Java_ru_axefu_ogava_Window_create(JNIEnv *env, jobject, jint width, jint height, jstring title) {
@@ -101,14 +110,12 @@ JNIEXPORT void JNICALL Java_ru_axefu_ogava_Window_loop(JNIEnv *env, jclass clazz
       windows = nullptr;
       glfwTerminate();
       glfwInitialized = false;
-      jfieldID glfwThread = env->GetStaticFieldID(clazz, "glfwThread", "Ljava/lang/Thread;");
-      env->SetStaticObjectField(clazz, glfwThread, nullptr);
+      glfwThreadSet(env, clazz, nullptr);
     }
 
-    if (ownerThreadWantInvoke) {
-      ownerThreadWantInvoke = false;
-      jmethodID applyInvoke = env->GetStaticMethodID(clazz, "applyInvoke", "()V");
-      env->CallStaticVoidMethod(clazz, applyInvoke);
+    if (mainThreadWantInvoke) {
+      mainThreadWantInvoke = false;
+      applyInvoke(env, clazz);
     }
   }
 }
