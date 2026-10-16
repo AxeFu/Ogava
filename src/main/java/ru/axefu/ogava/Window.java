@@ -5,7 +5,7 @@ import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.CountDownLatch;
 
 public class Window implements Closeable {
-    public static final Object lock = new Object();
+    private static final Object lock = new Object();
     private static volatile Thread glfwThread;
     static {
         System.loadLibrary("ogava");
@@ -21,10 +21,8 @@ public class Window implements Closeable {
             if (id < 0) {
                 throw new RuntimeException("Failed to create window: " + id);
             }
-            if (glfwThread == null) {//с текущей реализацией эта ифка всегда false из-за метода invoke(), оставлена здесь на случай рефакторинга. //TODO добавление конструктора блокирующего основной поток для GLFW
-                System.err.println("Поток вызвавший конструктор Window заблокирован. ИСПРАВИТЬ!");
-                glfwThread = Thread.currentThread();
-                loop();
+            if (glfwThread == null) {//с текущей реализацией эта ифка всегда false из-за метода invokeLater();
+                throw new NullPointerException("glfwThread is null");
             }
         });
     }
@@ -34,19 +32,15 @@ public class Window implements Closeable {
      */
     @Override
     public void close() {
-        invokeLater(() -> close(id));
+        invoke(() -> close(id));
     }
 
-    private static ConcurrentLinkedDeque<Runnable> buffer2 = new ConcurrentLinkedDeque<>();
-    private static ConcurrentLinkedDeque<Runnable> buffer = new ConcurrentLinkedDeque<>();
+    private static final ConcurrentLinkedDeque<Runnable> runnables = new ConcurrentLinkedDeque<>();
     private static void applyInvoke() {
-        ConcurrentLinkedDeque<Runnable> runnables = buffer;
-        buffer = buffer2;
-        buffer2 = runnables;
-        for (Runnable runnable : runnables) {
-            runnable.run();
+        Runnable task;
+        while ((task = runnables.pollFirst()) != null) {
+            task.run();
         }
-        runnables.clear();
     }
 
     /**
@@ -57,16 +51,22 @@ public class Window implements Closeable {
      * @param runnable функция, которая будет вызвана в glfwThread
      */
     public static void invokeLater(Runnable runnable) {
-        buffer.addLast(runnable);
+        runnables.addLast(runnable);
         if (glfwThread == null) {
             synchronized (lock) {
                 if (glfwThread == null) {
-                glfwThread = Thread.ofPlatform().start(() -> {
-                    Window.applyInvoke();
-                    loop();
-                });
-                return;
+                    glfwThread = Thread.ofPlatform().start(() -> {
+                        try {
+                            Window.applyInvoke();
+                            loop();
+                        } finally {
+                            synchronized (lock) {
+                                glfwThread = null;
+                            }
+                        }
+                    });
                 }
+                return;
             }
         }
         invokeLater();
@@ -77,18 +77,29 @@ public class Window implements Closeable {
      * @param runnable - функция, ктоорая будет вызвана в glfwThread
      */
     public static void invoke(Runnable runnable) {
-        CountDownLatch latch = new CountDownLatch(1);
-        invokeLater(() -> {
+        if (Thread.currentThread() == glfwThread) {
             runnable.run();
-            //Костыль: возможна ситуация когда предыдущая run() назначает glfwThread равным null, в этот момент текущий run вызывает конструктор Window то поток встаёт намертво в loop(), потому вызова countDown не происходит
-            //invokeLater() производит повторное создание потока если он null
-            invokeLater(latch::countDown);
+            return;
+        }
+        CountDownLatch latch = new CountDownLatch(1);
+        final Throwable[] throwable = {null};
+        invokeLater(() -> {
+            try {
+                runnable.run();
+            } catch (Throwable e) {
+                throwable[0] = e;
+            } finally {
+                latch.countDown();
+            }
         });
 
         try {
             latch.await();
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
+        }
+        if (throwable[0] != null) {
+            throw new RuntimeException(throwable[0]);
         }
     }
 

@@ -5,9 +5,10 @@
 #include <GLFW/glfw3.h>
 #include <jni.h>
 #include <vector>
+#include <atomic>
 
 static bool glfwInitialized = false;
-static bool mainThreadWantInvoke = false;
+static std::atomic_bool mainThreadWantInvoke{false};
 static std::vector<GLFWwindow*>* windows;
 
 long init() {
@@ -31,17 +32,12 @@ void applyInvoke(JNIEnv *env, jclass clazz) {
   env->CallStaticVoidMethod(clazz, applyInvoke);
 }
 
-void glfwThreadSet(JNIEnv *env, jclass clazz, jobject value) {
-  jfieldID glfwThread = env->GetStaticFieldID(clazz, "glfwThread", "Ljava/lang/Thread;");
-  env->SetStaticObjectField(clazz, glfwThread, value);
-}
-
 void tick(GLFWwindow* window) {
   //TODO: run commands from command buffer
 }
 
 JNIEXPORT void JNICALL Java_ru_axefu_ogava_Window_invokeLater(JNIEnv *, jclass) {
-  mainThreadWantInvoke = true;
+  mainThreadWantInvoke.store(true, std::memory_order_relaxed);
 }
 
 JNIEXPORT jlong JNICALL Java_ru_axefu_ogava_Window_create(JNIEnv *env, jobject, jint width, jint height, jstring title) {
@@ -54,7 +50,6 @@ JNIEXPORT jlong JNICALL Java_ru_axefu_ogava_Window_create(JNIEnv *env, jobject, 
   env->ReleaseStringUTFChars(title, cstr);
 
   if (window == nullptr) {
-    glfwTerminate();
     return -2;
   }
 
@@ -62,7 +57,6 @@ JNIEXPORT jlong JNICALL Java_ru_axefu_ogava_Window_create(JNIEnv *env, jobject, 
 
   glewExperimental = true;
   if (glewInit() != GLEW_OK) {
-    glfwTerminate();
     return -3;
   }
 
@@ -90,19 +84,19 @@ JNIEXPORT void JNICALL Java_ru_axefu_ogava_Window_loop(JNIEnv *env, jclass clazz
 
     auto it = windows->begin();
     while (it != windows->end()) {
-        GLFWwindow* window = *it;
-        if (glfwWindowShouldClose(window)) {
-          glfwDestroyWindow(window);
-          it = windows->erase(it);
-          continue;
-        }
-        glfwMakeContextCurrent(window);
+      GLFWwindow* window = *it;
+      if (glfwWindowShouldClose(window)) {
+        glfwDestroyWindow(window);
+        it = windows->erase(it);
+        continue;
+      }
+      glfwMakeContextCurrent(window);
 
-        tick(window);
+      tick(window);
 
-        glfwSwapBuffers(window);
-        glfwMakeContextCurrent(nullptr);
-        ++it;
+      glfwSwapBuffers(window);
+      glfwMakeContextCurrent(nullptr);
+      ++it;
     }
 
     if (windows->size() == 0) {
@@ -110,11 +104,9 @@ JNIEXPORT void JNICALL Java_ru_axefu_ogava_Window_loop(JNIEnv *env, jclass clazz
       windows = nullptr;
       glfwTerminate();
       glfwInitialized = false;
-      glfwThreadSet(env, clazz, nullptr);
     }
 
-    if (mainThreadWantInvoke) {
-      mainThreadWantInvoke = false;
+    if (mainThreadWantInvoke.exchange(false, std::memory_order_relaxed)) {
       applyInvoke(env, clazz);
     }
   }
