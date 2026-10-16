@@ -1,6 +1,7 @@
 #include "ru_axefu_ogava_Window.h"
 
 #define GLEW_STATIC
+#include <algorithm>
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include <jni.h>
@@ -34,6 +35,10 @@ void applyInvoke(JNIEnv *env, jclass clazz) {
 
 void tick(GLFWwindow* window) {
   //TODO: run commands from command buffer
+}
+
+bool glfwWindowExists(GLFWwindow* window) {
+  return windows != nullptr && std::find(windows->begin(), windows->end(), window) != windows->end();
 }
 
 JNIEXPORT void JNICALL Java_ru_axefu_ogava_Window_invokeLater(JNIEnv *, jclass) {
@@ -74,8 +79,11 @@ JNIEXPORT jlong JNICALL Java_ru_axefu_ogava_Window_create(JNIEnv *env, jobject, 
 }
 
 JNIEXPORT void JNICALL Java_ru_axefu_ogava_Window_close(JNIEnv *, jobject, jlong pointer) {
+  if (windows == nullptr) return;
   GLFWwindow* window = (GLFWwindow*)(uintptr_t)pointer;
-  glfwSetWindowShouldClose(window, GL_TRUE);
+  if (glfwWindowExists(window)) {
+    glfwSetWindowShouldClose(window, GL_TRUE);
+  }
 }
 
 JNIEXPORT void JNICALL Java_ru_axefu_ogava_Window_loop(JNIEnv *env, jclass clazz) {
