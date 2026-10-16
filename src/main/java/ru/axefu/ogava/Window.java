@@ -21,7 +21,8 @@ public class Window implements Closeable {
             if (id < 0) {
                 throw new RuntimeException("Failed to create window: " + id);
             }
-            if (glfwThread == null) {
+            if (glfwThread == null) {//с текущей реализацией эта ифка всегда false из-за метода invoke(), оставлена здесь на случай рефакторинга. //TODO добавление конструктора блокирующего основной поток для GLFW
+                System.err.println("Поток вызвавший конструктор Window заблокирован. ИСПРАВИТЬ!");
                 glfwThread = Thread.currentThread();
                 loop();
             }
