@@ -32,10 +32,7 @@ public class Window implements Closeable {
      */
     @Override
     public void close() {
-        if (id < 0) return;
-        final long window = id;
-        invokeLater(() -> close(window));
-        id = -1;
+        invokeLater(() -> close(id));
     }
 
     private static final ConcurrentLinkedDeque<Runnable> runnables = new ConcurrentLinkedDeque<>();
@@ -54,25 +51,27 @@ public class Window implements Closeable {
      * @param runnable функция, которая будет вызвана в glfwThread
      */
     public static void invokeLater(Runnable runnable) {
-        runnables.addLast(runnable);
-        if (glfwThread == null) {
-            synchronized (lock) {
-                if (glfwThread == null) {
-                    glfwThread = Thread.ofPlatform().start(() -> {
+        synchronized (lock) {
+            runnables.addLast(runnable);
+            invokeLater();
+            if (glfwThread == null) {
+                glfwThread = new Thread(() -> {
+                    while (Thread.currentThread() == glfwThread) {
                         try {
                             Window.applyInvoke();
                             loop();
                         } finally {
                             synchronized (lock) {
-                                glfwThread = null;
+                                if (runnables.isEmpty()) {
+                                    glfwThread = null;
+                                }
                             }
                         }
-                    });
-                }
-                return;
+                    }
+                });
+                glfwThread.start();
             }
         }
-        invokeLater();
     }
 
     /**
