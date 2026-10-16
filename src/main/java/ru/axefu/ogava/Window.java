@@ -80,6 +80,8 @@ public class Window implements Closeable {
         CountDownLatch latch = new CountDownLatch(1);
         invokeLater(() -> {
             runnable.run();
+            //Костыль: возможна ситуация когда предыдущая run() назначает glfwThread равным null, в этот момент текущий run вызывает конструктор Window то поток встаёт намертво в loop(), потому вызова countDown не происходит
+            //invokeLater() производит повторное создание потока если он null
             invokeLater(latch::countDown);
         });
 
