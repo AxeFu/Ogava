@@ -32,7 +32,7 @@ public class Window implements Closeable {
      */
     @Override
     public void close() {
-        invoke(() -> close(id));
+        invokeLater(() -> close(id));
     }
 
     private static final ConcurrentLinkedDeque<Runnable> runnables = new ConcurrentLinkedDeque<>();
