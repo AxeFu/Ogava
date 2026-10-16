@@ -34,7 +34,7 @@ public class Window implements Closeable {
      */
     @Override
     public void close() {
-        invoke(() -> close(id));
+        invokeLater(() -> close(id));
     }
 
     private static ConcurrentLinkedDeque<Runnable> buffer2 = new ConcurrentLinkedDeque<>();
