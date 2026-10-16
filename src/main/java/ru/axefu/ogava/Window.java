@@ -35,14 +35,6 @@ public class Window implements Closeable {
         invokeLater(() -> close(id));
     }
 
-    private static final ConcurrentLinkedDeque<Runnable> runnables = new ConcurrentLinkedDeque<>();
-    private static void applyInvoke() {
-        Runnable task;
-        while ((task = runnables.pollFirst()) != null) {
-            task.run();
-        }
-    }
-
     /**
      * Просит glfwThread отвлечься от работы с контекстом glfw
      * thread возвращается в окружение Java и выполняет <code>applyInvoke()</code>
@@ -73,7 +65,6 @@ public class Window implements Closeable {
             }
         }
     }
-
     /**
      * <code>invokeLater()</code>, но с блокировкой вызывающего потока, синхронный метод
      * @param runnable - функция, ктоорая будет вызвана в glfwThread
@@ -126,6 +117,14 @@ public class Window implements Closeable {
      * Перед своим завершением метод назначает <code>glfwThread = null</code>
      */
     private static native void loop();
+
+    private static final ConcurrentLinkedDeque<Runnable> runnables = new ConcurrentLinkedDeque<>();
+    private static void applyInvoke() {
+        Runnable task;
+        while ((task = runnables.pollFirst()) != null) {
+            task.run();
+        }
+    }
 
     /**
      * Сообщает glfwThread о том что основной поток хочет вызвать метод, происходит это изменением флага на true
