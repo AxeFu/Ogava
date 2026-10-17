@@ -21,10 +21,45 @@ public class Window implements Closeable {
             if (id < 0) {
                 throw new RuntimeException("Failed to create window: " + id);
             }
-            if (glfwThread == null) {//с текущей реализацией эта ифка всегда false из-за метода invokeLater();
+            if (glfwThread == null) {
                 throw new NullPointerException("glfwThread is null");
             }
         });
+    }
+
+    /**
+     * Устанавливает входящий поток для glfw контекста и блокирует его, данный поток будет исполнять все invoke и invokeLater вызовы
+     * @param runnable - вызов после назначения glfwThread = Thread.currentThread(), рекомендуется создать окно
+     */
+    public static void setGlfwThread(Runnable runnable) {
+        if (glfwThread != null && glfwThread != Thread.currentThread()) {
+            throw new IllegalStateException("glfwThread is already set, close all windows in program");
+        }
+        glfwThread = Thread.currentThread();
+        runnable.run();
+        setGlfwThread();
+    }
+
+    /**
+     * Устанавливает входящий поток для glfw контекста и блокирует его, данный поток будет исполнять все invoke и invokeLater вызовы
+     */
+    public static void setGlfwThread() {
+        if (glfwThread != null && glfwThread != Thread.currentThread()) {
+            throw new IllegalStateException("glfwThread is already set, close all windows in program");
+        }
+        glfwThread = Thread.currentThread();
+        while (Thread.currentThread() == glfwThread) {
+            try {
+                Window.applyInvoke();
+                loop();
+            } finally {
+                synchronized (lock) {
+                    if (runnables.isEmpty()) {
+                        glfwThread = null;
+                    }
+                }
+            }
+        }
     }
 
     /**
@@ -47,21 +82,7 @@ public class Window implements Closeable {
             runnables.addLast(runnable);
             invokeLater();
             if (glfwThread == null) {
-                glfwThread = new Thread(() -> {
-                    while (Thread.currentThread() == glfwThread) {
-                        try {
-                            Window.applyInvoke();
-                            loop();
-                        } finally {
-                            synchronized (lock) {
-                                if (runnables.isEmpty()) {
-                                    glfwThread = null;
-                                }
-                            }
-                        }
-                    }
-                });
-                glfwThread.start();
+                Thread.ofPlatform().start(Window::setGlfwThread);
             }
         }
     }
