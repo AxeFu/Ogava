@@ -17,7 +17,7 @@ public abstract class Application {
         StackTraceElement[] stackTrace = Thread.currentThread().getStackTrace();
         try {
             Class<?> caller = Class.forName(stackTrace[2].getClassName());
-            if (macOS) {
+            if (macOS) {//Согласно интернету GLFW контекст на маках должен обрабатываться в main Thread потоке
                 Thread programThread;
                 Window.setGlfwThread(programThread = new Thread(() -> Application.start(caller)));
                 if (!programThread.isInterrupted()) {
