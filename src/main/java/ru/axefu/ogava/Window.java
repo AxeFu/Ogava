@@ -78,13 +78,11 @@ public class Window implements Closeable {
      * @param runnable функция, которая будет вызвана в glfwThread
      */
     public static void invokeLater(Runnable runnable) {
-        runnables.addLast(runnable);
-        invokeLater();
-        if (glfwThread == null) {
-            synchronized (lock) {
-                if (glfwThread == null) {
-                    Thread.ofPlatform().start(Window::setGlfwThread);
-                }
+        synchronized (lock) {
+            runnables.addLast(runnable);
+            invokeLater();
+            if (glfwThread == null) {
+                Thread.ofPlatform().start(Window::setGlfwThread);
             }
         }
     }
