@@ -36,7 +36,7 @@ public class Window implements Closeable {
             throw new IllegalStateException("glfwThread is already set, close all windows in program");
         }
         glfwThread = Thread.currentThread();
-        runnable.run();
+        invokeLater(runnable);
         setGlfwThread();
     }
 
@@ -78,11 +78,13 @@ public class Window implements Closeable {
      * @param runnable функция, которая будет вызвана в glfwThread
      */
     public static void invokeLater(Runnable runnable) {
-        synchronized (lock) {
-            runnables.addLast(runnable);
-            invokeLater();
-            if (glfwThread == null) {
-                Thread.ofPlatform().start(Window::setGlfwThread);
+        runnables.addLast(runnable);
+        invokeLater();
+        if (glfwThread == null) {
+            synchronized (lock) {
+                if (glfwThread == null) {
+                    Thread.ofPlatform().start(Window::setGlfwThread);
+                }
             }
         }
     }
@@ -115,6 +117,11 @@ public class Window implements Closeable {
         if (throwable[0] != null) {
             throw new RuntimeException(throwable[0]);
         }
+    }
+
+    @Override
+    public String toString() {
+        return "GLFWwindow: " + id;
     }
 
     /**
